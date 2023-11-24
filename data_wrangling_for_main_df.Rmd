@@ -1,0 +1,99 @@
+---
+title: "data_wrangling_22oct23"
+output: html_document
+date: "Fall 2023"
+---
+
+```{r}
+# load in libraries
+library(tidyverse)
+```
+
+```{r}
+# read in the data from the CSV
+# I have the data stored locally on my password protected computer, but we can 
+# also put it in the password and 2FA protected OneDrive.
+# I don't think keeping the data on Github would offer enough patient privacy.
+
+# working_directory <- getwd() # if files aren't reading in, then un-comment this line to double check that the files are in the same folder that this RMD is in and that R also knows that
+
+control_vs_treatment_df <- readr::read_csv("all_events_by_pt_only_week80.csv")
+longitudinal_by_day_df <- readr::read_csv("LONGITUDINAL_by_day.csv")
+demographics_df <- readxl::read_excel("Book3.xlsx")
+```
+
+```{r}
+# connecting the treatment vs control to the big df
+ID_and_control_vs_treatment_df <- control_vs_treatment_df %>%
+  dplyr::select(ID, group) %>% # keep only the two columns to classify treatment or not
+  dplyr::distinct() # remove duplicates
+
+
+# rename the ID column to participant to match longitudinal_by_day_df
+# Rename the column name - id to participant in ID_and_control_vs_treatment_df
+colnames(ID_and_control_vs_treatment_df)[colnames(ID_and_control_vs_treatment_df) == "ID"] ="PARTICIPANT"
+
+
+colnames(demographics_df)[colnames(demographics_df) == "Participant ID"] ="PARTICIPANT"
+```
+
+```{r}
+# join the df by the unique ID
+# right_join() keeps all observations in y. longitudinal_by_day_df shall be our y df.
+
+complete_df <- ID_and_control_vs_treatment_df %>%
+  right_join(
+  x = ID_and_control_vs_treatment_df,
+  y = longitudinal_by_day_df,
+  by = "PARTICIPANT",
+  multiple = "all"
+)
+
+complete_df <- ID_and_control_vs_treatment_df %>%
+  right_join(
+  x = demographics_df,
+  y = complete_df,
+  by = "PARTICIPANT",
+  multiple = "all"
+)
+```
+
+```{r}
+# check: are there any observations in longitudinal_by_day_df that were NOT matched with an ID from control_vs_treatment_df?
+# YES THERE ARE
+
+# print ("Row and Col positions of NA values") 
+# which(is.na(complete_df$group), arr.ind=TRUE)
+
+# QUESTION: are these participants who dropped out early? or who had a mismatch between the
+# November day-by-day and the all_events_by_pt_only_week80.csv ?
+
+```
+
+```{r}
+# filter to just have the days with over 80% coverage over the 24 hours of each day.
+complete_df <- complete_df %>%
+  dplyr::filter(HOURS_COVERAGE > 0.8*24)
+
+# this would be a good place to filter out participants who were only in the study for a couple days / weeks then dropped out.
+```
+
+```{r}
+
+full_year_df <- complete_df %>%
+  dplyr::mutate( # select dates to be in the holiday date range zone
+    holiday_months_dummy_variable = case_when(complete_df$DATE < ymd("2021-11-24") ~ "0",
+                                            complete_df$DATE > ymd("2022-12-31") ~ "0",
+                                            1==1 ~ "1"))
+  
+
+```
+
+```{r}
+# write full_year_df to a CSV
+# working_directory <- getwd() 
+
+# save this complete_df as a CSV in your current working directory
+write.csv(full_year_df, "full_df.csv")
+
+```
