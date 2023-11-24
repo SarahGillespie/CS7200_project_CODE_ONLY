@@ -23,7 +23,7 @@ library(emmeans)
 
 # DATA
 # read in the data from the CSV
-#data <- read.csv('data_full.csv')
+data <- read.csv('data_full.csv')
 
 
 
@@ -169,9 +169,11 @@ ggplot(data, aes(as.factor(PARTICIPANT), y = activity, color = holiday_group)) +
 # only control vs treatment per participant
 ggplot(data, aes(as.factor(PARTICIPANT), y = activity, color = group)) +
   stat_summary(fun = mean, geom = "point") +
-  stat_summary(fun= mean, geom = "line", aes(group = group)) +
+  # stat_summary(fun= mean, geom = "line", aes(group = group)) +
   labs(x = "Participant ID", y = "Mean Activity", color = "Group") +
-  ylim(0,1)
+  ylim(0,1) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1)) +
+  geom_hline(yintercept = mean(data$activity))
 
  
 # Model 2: Two-way random effects ANOVA & ML ------------------------------------
