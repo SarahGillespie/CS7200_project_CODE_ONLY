@@ -1,10 +1,10 @@
-
 library(tidyverse)
 library(lme4)
 library(sjPlot)
 library(emmeans)
+library(AID)
 
-# Goals: 
+# GOALS ------------------------------------------------------------------------
 # 1) Does holiday make a difference on activity Y_activityij = β0 + β1Holiday + γi + ϵij  
 # 2) Does holiday and personalized health coaching make a difference on activity
 # Y_activityij = β0 + β1Treatment + β2Holiday + β3Treatment*Holiday + γi + ϵij 
@@ -21,7 +21,7 @@ library(emmeans)
 # When looking into holiday*group, interaction is significant
 # When separating holiday/group into 4 groups, found interaction does not matter
 
-# DATA
+# DATA -------------------------------------------------------------------------
 # read in the data from the CSV
 data <- read.csv('data_full.csv')
 
@@ -42,18 +42,16 @@ data <- data %>%
 hist(data$activity)  # skewed right
 shapiro.test(data$activity) # p-value is significant, cannot assume normality
 
-# basic t-test to see if there if a difference between the two groups...
+# SEG: basic t-test to see if there if a difference between the two groups...
 # but we really should use that Wilcoxon test.
-# find mean and standard deviation of each group.
-
+# find mean and standard deviation of each group before the Wilcox test.
 sum_stats_basic_t_test <- data %>%
   group_by(group) %>%
   summarise(mean_activity = mean(activity), sd(activity))
 
-
-# Density plots with semi-transparent fill with the distribution of activity each day for each group.
+# SEG: Density plots with semi-transparent fill with the distribution of activity each day for each group.
+# SEG: note that this graph is NOT the data normalized via boxcoxnc in Dorsa's code.
 ggplot(data, aes(x=activity, fill=group)) + geom_density(alpha=.3)
-
 
 # Wilcoxon is non-parametric equivalent to t-test
 
@@ -69,7 +67,7 @@ agg_month_part <- data %>%
 
 ggplot(agg_part, aes(PARTICIPANT, hours, fill = group)) +
   geom_col() # This is similar to Ethan's paper which shows variance in the time
-# each participant contributes in our dataset
+# each participant contributes in our data set
 
 # EDA: holiday vs non-holiday activity ------------------------------------
 ggplot(data, aes(holiday, activity)) +
@@ -84,7 +82,7 @@ data %>%
     IQR = IQR(activity, na.rm = TRUE)
   )
 
-wilcox.test(activity ~ holiday, data, alternative = 'greater')$p.value 
+wilcox.test(activity ~ holiday, data, alternative = 'greater')$p.value
 # non-holiday greater activity
 
 # EDA: holiday_treatment vs non activity ------------------------------------
@@ -101,8 +99,11 @@ data %>%
     count = n(),
     mean = mean(activity),
     median = median(activity, na.rm = TRUE),
+    sd = sd(activity, na.rm = TRUE), #SEG: added standard deviation.
     IQR = IQR(activity, na.rm = TRUE)
-  )
+  ) 
+# SEG: we could calculate confidence intervals from these values if that would
+# be helpful for graphs.
 
 wilcox.test(activity ~ holiday_treatment, data, alternative = 'greater')$p.value 
 # holiday and treatment greater activity
@@ -110,7 +111,7 @@ wilcox.test(activity ~ holiday_treatment, data, alternative = 'greater')$p.value
 kruskal.test(activity ~ group, data) # there is a difference between treatment groups
 kruskal.test(activity ~ holiday, data) # there is a difference between holiday periods
 
-# Model 1: repeated measures with MLE for holiday ------------------------------------
+# Model 1: repeated measures with MLE for holiday ------------------------------
 model1 <- lmer(activity ~ holiday + 1 + (1|PARTICIPANT), data, REML=FALSE)
 tab_model(model1)
 
@@ -128,10 +129,10 @@ ggplot(agg_month, aes(month, y = mean, color = as.factor(group))) +
   labs(x = "Month", y = "Mean Activity", color = "Group") +
   ylim(0,1)
 
-# Test for Interaction between holiday and treatment ------------------------------------
+# Test for Interaction between holiday and treatment ---------------------------
 ## Visualize Treatment Means Plot
 means <- data %>% 
-  select(group, holiday, activity) %>% 
+  dplyr::select(group, holiday, activity) %>% 
   group_by(holiday, group) %>% 
   summarize(means = mean(activity))
 
@@ -140,18 +141,27 @@ ggplot(means, aes(as.factor(holiday), y = means, color = as.factor(group))) +
   stat_summary(fun= mean, geom = "line", aes(group = as.factor(group))) +
   labs(x = "Holiday", y = "Mean Activity", color = "Group")
 
-# there are differences in mean responses across levels and lines not parallel
-# there is interaction
+# the visualization depicts differences in mean responses across levels since the 
+# lines not parallel. This means there is interaction
 
 ## Check if residuals are normal to see if we can use F-test
 fit1 <- glm(activity ~ group*holiday, family = gaussian, data)
+plot(fit1) #SEG: plots residuals
 fit2 <- lm(activity ~ group*holiday, data)
+plot(fit2) #SEG: plots residuals
 # we can use generalized linear models to handle non-normal data
 
 res <- residuals(fit1)
 hist(res) # looks approx normal?
-shapiro.test(res) # not normal because low p-value but okay because notes from 7
-## also not normal?
+shapiro.test(res) # not normally distributed because low p-value but okay because
+# notes from Section 7 is also not normal?
+
+# SEG: for the Shapiro test, large p-value indicates the data set is normally distributed,
+# whereas a low p-value indicates that these residuals aren't normally distributed.
+# each one of these subsets of the data has a very low p-value.
+# the plot(fit1) and plot(fit2) graphs do seem to have standardized residuals
+# that are more positive than negative...
+ 
 
 ## F-test
 summary(fit1)
@@ -160,11 +170,8 @@ summary(fit1)
 # main effect for group p-value low = group affects activity
 # this affirms results with visual
 
-# look into slides starting 7-41 for "interaction important"
-# marginal means?
 
-
-# Two-way Random Effects ---------------------------------------------------------------
+# Two-way Random Effects -------------------------------------------------------
 # Factor A: Participant 1-30
 # Factor B: holiday_group: 1-4
 # imbalanced design because not all participants per month
@@ -190,7 +197,11 @@ ggplot(data, aes(as.factor(PARTICIPANT), y = activity, color = group)) +
   geom_hline(yintercept = mean(data$activity))
 
  
-# Model 2: Two-way random effects ANOVA & ML ------------------------------------
+# Model 2: Two-way random effects ANOVA & ML -----------------------------------
+
+# SEG: initially Shira and I assumed that the data was normal enough to apply ANOVA
+# but perhaps we should chat with Ethan during office hours to decide if we need
+# to normalize the data with a log transformation or boxcoxnc before doing the ANOVA.
 
 # ANOVA
 model2 <- aov(activity ~ PARTICIPANT*holiday_group, data)
@@ -219,7 +230,7 @@ model6 <- lmer(activity ~ 1 + (1|PARTICIPANT)+(1|holiday_group), data,
 summary(model6)
 
 
-# Mixed Model -------------------------------------------------------------
+# Mixed Model ------------------------------------------------------------------
 model7<- lmer(activity ~ month + (1|holiday_group) + (1|PARTICIPANT) + 
        (1|month:PARTICIPANT), data, REML=TRUE)
 summary(model7)
