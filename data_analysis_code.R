@@ -25,21 +25,35 @@ library(emmeans)
 # read in the data from the CSV
 data <- read.csv('data_full.csv')
 
-
-
 data <- data %>% 
   drop_na(group) %>% # dropped participants who were not in either control or treatment
   mutate(PARTICIPANT = as.factor(PARTICIPANT),
       holiday = as.factor(holiday_months_dummy_variable), 
         activity = (Ambulation + Upright..Other.) / HOURS_COVERAGE,
+      # this creates a fraction that is the proportion of activity RELATIVE to all hours covered in total.
+      # activity is a ratio/proportion, NOT a quantity of hours.
         holiday_treatment = as.factor(ifelse(group == 'Treatment' & holiday == 1, 1, 0)),
         holiday_group = as.factor(ifelse(group == 'Treatment' & holiday == 1, 1,
                                          ifelse(group == 'Treatment' & holiday == 0, 2,
                                                 ifelse(group == 'Control' & holiday == 1, 3, 4)))),
       month = as.factor(format(as.Date(DATE, format="%Y-%m-%d"),"%m")))
 
+
 hist(data$activity)  # skewed right
 shapiro.test(data$activity) # p-value is significant, cannot assume normality
+
+# basic t-test to see if there if a difference between the two groups...
+# but we really should use that Wilcoxon test.
+# find mean and standard deviation of each group.
+
+sum_stats_basic_t_test <- data %>%
+  group_by(group) %>%
+  summarise(mean_activity = mean(activity), sd(activity))
+
+
+# Density plots with semi-transparent fill with the distribution of activity each day for each group.
+ggplot(data, aes(x=activity, fill=group)) + geom_density(alpha=.3)
+
 
 # Wilcoxon is non-parametric equivalent to t-test
 
@@ -55,7 +69,7 @@ agg_month_part <- data %>%
 
 ggplot(agg_part, aes(PARTICIPANT, hours, fill = group)) +
   geom_col() # This is similar to Ethan's paper which shows variance in the time
-## each participant contributes in our dataset
+# each participant contributes in our dataset
 
 # EDA: holiday vs non-holiday activity ------------------------------------
 ggplot(data, aes(holiday, activity)) +
