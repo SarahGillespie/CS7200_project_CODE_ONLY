@@ -4,12 +4,12 @@ output: html_document
 date: "2023-11-25"
 ---
 ```{r}
-library(tidyverse)
+library(tidyverse) # SEG: tidyverse contains both magrittr and dplyr.
 library(lme4)
 library(sjPlot)
 library(emmeans)
-library(magrittr) # needs to be run every time you start R and want to use %>%
-library(dplyr)    # alternatively, this also loads %>%
+# library(magrittr) # needs to be run every time you start R and want to use %>%
+# library(dplyr)    # alternatively, this also loads %>%
 library(AID)
 library(multcomp)
 library(car)
@@ -40,6 +40,10 @@ hist(holiday_treatment_df$activity)
 shapiro.test(holiday_treatment_df$activity) 
 print(length(holiday_treatment_df))
 
+# SEG: for the Shapiro test, large p-value indicates the data set is normally distributed,
+# whereas a low p-value indicates that it isn't normally distributed.
+# each one of these subsets of the data has a very low p-value.
+
 hist(non_holiday_treatment_df$activity) 
 shapiro.test(non_holiday_treatment_df$activity) 
 print(length(non_holiday_treatment_df))
@@ -52,12 +56,23 @@ hist(non_holiday_control_df$activity)
 shapiro.test(non_holiday_control_df$activity)
 print(length(non_holiday_control_df))
 
+# SEG: given that the data isn't normal, as shown in the tests above,
+# and that we have a hard limit on the normality with the 0 hour boundary on 
+# the left-side tail, would normalizing to use ANOVA be a legitimate method?
+# It could work since it's looking at the data from a log-transform perspective, 
+# but let's check with ethan about this.
+
 #normalizing to use anova 
 out1=boxcoxnc(holiday_treatment_df$activity, lambda2 = 0.001)
 holiday_treatment_df$activity = out1$tf.data 
 
 out2=boxcoxnc(non_holiday_treatment_df$activity, lambda2 = 0.001)
 non_holiday_treatment_df$activity = out2$tf.data
+# SEG: check the normality results of out2 after trying to normalize with boxcoxnc.
+# this does appear to have a high p-value after boxcoxnc !
+hist(non_holiday_treatment_df$activity) 
+shapiro.test(non_holiday_treatment_df$activity) 
+
 
 out3=boxcoxnc(holiday_control_df$activity, lambda2 = 0.001)
 holiday_control_df$activity = out3$tf.data
@@ -67,7 +82,12 @@ non_holiday_control_df$activity = out4$tf.data
 
 
 fulldf = rbind(holiday_treatment_df,non_holiday_treatment_df,holiday_control_df,non_holiday_control_df)
-#some of these are normal and the histogram looks good so im just gonna go with it? 
+#some of these are normal and the histogram looks good so im just gonna go with it?
+
+# SEG: please rephrase the above comment before we turn this project and code in to Olga.
+# SEG: a better option than eyeballing it would be to test normality using the 
+# shapiro.test like i added for out2.
+
 res.aov <- aov(activity ~ holiday_group, data = fulldf)
 # Summary of the analysis
 summary(res.aov)
@@ -78,3 +98,14 @@ TukeyHSD(res.aov)
 summary(glht(res.aov, linfct = mcp(holiday_group = "Tukey")))
 
 leveneTest(activity ~ holiday_group, data = fulldf)
+
+# SEG: my interpretation of the above results:
+# Tukey test results tells us that there are stat. sig difference in all the observed means.
+# except for 3-2 (non_holiday_treatment_df = 2 and holiday_control_df = 3)
+# leveneTest results tells us that the groups have different variances.
+# I'm not sure how to interpret the F value of 324.46 in this test...
+# F value = variance of the group means (Mean Square Between) / mean of the within group variances (Mean Squared Error) so seems like we definitely have differences between the groups.
+
+# SEG: my interpretation on how this matters overall: I feel confident saying activity decreases during the holiday period. From our exploratory data analysis, it does appear that the decrease in activity extends through the chilly winter months,
+# so I'm not sure if we can definitely say holidays are the reason for decreased activity, as opposed to it being colder and dark earlier.
+```
