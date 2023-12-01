@@ -58,7 +58,6 @@ print(colnames(agg_part))
     labs(
     title = "coverage hours of participants split by group",
   )
-
     
      ggplot(agg_part, aes(PARTICIPANT, hours, fill = half)) +
   geom_col() + 
@@ -66,6 +65,11 @@ print(colnames(agg_part))
     title = "coverage hours of participants split by half",
   ) + facet_wrap(~half)
     
+      ggplot(agg_part, aes(PARTICIPANT, hours, fill = interaction(group,half))) +
+  geom_col() + 
+    labs(
+    title = "coverage hours of participants split by group and half",
+  ) + facet_wrap(~interaction(group,half))
     
   ggplot(agg_part, aes(PARTICIPANT, activity, fill = group)) +
   geom_col() + 
@@ -77,6 +81,12 @@ print(colnames(agg_part))
     labs(
     title = "average activity of participants split by half",
   )+ facet_wrap(~half)
+   
+    ggplot(agg_part, aes(PARTICIPANT, activity, fill = interaction(group,half))) +
+  geom_col() + 
+    labs(
+    title = "average activity of participants split by group and half",
+  )+ facet_wrap(~ interaction(group,half))
    
   
   ggplot(agg_part, aes(PARTICIPANT, ambulation, fill = group)) +
@@ -91,6 +101,13 @@ print(colnames(agg_part))
     title = "average ambulation of participants split by half",
   )+ facet_wrap(~half)
   
+   ggplot(agg_part, aes(PARTICIPANT, ambulation, fill =interaction(group,half))) +
+  geom_col()+
+    labs(
+    title = "average ambulation of participants split by group and half",
+  )+ facet_wrap(~interaction(group,half))
+  
+  
   ggplot(agg_part, aes(PARTICIPANT, upright, fill = group)) +
   geom_col() + 
     labs(
@@ -103,6 +120,12 @@ print(colnames(agg_part))
     title = "average upright time of participants split by half",
   )+ facet_wrap(~half)
   
+  
+   ggplot(agg_part, aes(PARTICIPANT, upright, fill = interaction(group,half))) +
+  geom_col() + 
+    labs(
+    title = "average upright time of participants split by group and half",
+  )+ facet_wrap(~interaction(group,half))
   
   
   #histograms 
