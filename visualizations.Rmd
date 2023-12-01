@@ -1,0 +1,174 @@
+---
+title: "dorsa_visualizations"
+output: html_document
+date: "2023-12-01"
+---
+```{r}
+suppressPackageStartupMessages({
+library(tidyverse)
+library(lme4)
+library(sjPlot)
+library(emmeans)
+library(AID)
+})
+options(warn=-1)
+
+data <- read.csv('data_full.csv')
+data$PARTICIPANT  <- sub("^CR", "", data$PARTICIPANT)
+data <- data %>% 
+  drop_na(group) %>% # dropped participants who were not in either control or treatment
+  mutate(PARTICIPANT = as.factor(PARTICIPANT),
+         activity = (Ambulation + Upright..Other.), 
+         ambulation = Ambulation ,
+         upright = Upright..Other., 
+         month = as.factor(format(as.Date(DATE, format="%Y-%m-%d"),"%m")),
+         year = as.factor(format(as.Date(DATE, format="%Y-%m-%d"),"%y")))
+
+
+# Balanced Design Attempt -------------------------------------------------
+# check how many months each participant contributed in each month
+# aggregate participant ambulation and upright by each month
+
+# participant data for May by first vs second half of month
+participant_05 <- data %>% 
+  filter(month == "05") %>% 
+  select(PARTICIPANT, group, DATE, activity, upright, ambulation,HOURS_COVERAGE) %>% 
+  mutate(day = as.numeric(format(as.Date(DATE), "%d")),
+         half = case_when(
+           day <= 15 ~ 0,
+           TRUE ~ 1),
+         half = as.factor(half))
+
+suppressMessages({
+agg_part <- participant_05 %>% 
+  select(PARTICIPANT, group, activity, upright, ambulation,HOURS_COVERAGE,half) %>%
+  group_by(PARTICIPANT, group,half) %>% 
+  summarize(activity = sum(activity),
+            ambulation = sum(ambulation), 
+            upright = sum(upright), 
+            hours = sum(HOURS_COVERAGE))
+})
+
+  agg_part <- agg_part %>% mutate(activity = activity/hours, 
+                                  ambulation = ambulation/hours, 
+                                  upright = upright/hours)
+print(colnames(agg_part))
+  ggplot(agg_part, aes(PARTICIPANT, hours, fill = group)) +
+  geom_col() + 
+    labs(
+    title = "coverage hours of participants split by group",
+  )
+
+    
+     ggplot(agg_part, aes(PARTICIPANT, hours, fill = half)) +
+  geom_col() + 
+    labs(
+    title = "coverage hours of participants split by half",
+  ) + facet_wrap(~half)
+    
+    
+  ggplot(agg_part, aes(PARTICIPANT, activity, fill = group)) +
+  geom_col() + 
+    labs(
+    title = "average activity of participants split by group",
+  )
+   ggplot(agg_part, aes(PARTICIPANT, activity, fill = half)) +
+  geom_col() + 
+    labs(
+    title = "average activity of participants split by half",
+  )+ facet_wrap(~half)
+   
+  
+  ggplot(agg_part, aes(PARTICIPANT, ambulation, fill = group)) +
+  geom_col()+
+    labs(
+    title = "average ambulation of participants split by group",
+  )
+  
+  ggplot(agg_part, aes(PARTICIPANT, ambulation, fill = half)) +
+  geom_col()+
+    labs(
+    title = "average ambulation of participants split by half",
+  )+ facet_wrap(~half)
+  
+  ggplot(agg_part, aes(PARTICIPANT, upright, fill = group)) +
+  geom_col() + 
+    labs(
+    title = "average upright time of participants split by group",
+  )
+  
+  ggplot(agg_part, aes(PARTICIPANT, upright, fill = half)) +
+  geom_col() + 
+    labs(
+    title = "average upright time of participants split by half",
+  )+ facet_wrap(~half)
+  
+  
+  
+  #histograms 
+  hist(agg_part$hours)
+  hist(agg_part$activity) 
+  hist(agg_part$ambulation)
+  hist(agg_part$upright)
+  
+  
+  participant_05 %>% 
+  group_by(group) %>% 
+  summarize(
+    count = n(),
+    mean = mean(activity),
+    median = median(activity, na.rm = TRUE),
+    sd = sd(activity,na.rm=TRUE),
+    IQR = IQR(activity, na.rm = TRUE)
+  )
+  
+ participant_05 %>% 
+  group_by(group) %>% 
+  summarize(
+    count = n(),
+    mean = mean(ambulation),
+    median = median(ambulation, na.rm = TRUE),
+    sd = sd(activity,na.rm=TRUE),
+    IQR = IQR(ambulation, na.rm = TRUE)
+  )
+
+ participant_05 %>% 
+  group_by(group) %>% 
+  summarize(
+    count = n(),
+    mean = mean(upright),
+    median = median(upright, na.rm = TRUE),
+    sd = sd(activity,na.rm=TRUE),
+    IQR = IQR(upright, na.rm = TRUE)
+  )
+
+  participant_05 %>% 
+  group_by(group,half) %>% 
+  summarize(
+    count = n(),
+    mean = mean(activity),
+    median = median(activity, na.rm = TRUE),
+    sd = sd(activity,na.rm=TRUE),
+    IQR = IQR(activity, na.rm = TRUE)
+  )
+  
+ participant_05 %>% 
+  group_by(group,half) %>% 
+  summarize(
+    count = n(),
+    mean = mean(ambulation),
+    median = median(ambulation, na.rm = TRUE),
+    sd = sd(activity,na.rm=TRUE),
+    IQR = IQR(ambulation, na.rm = TRUE)
+  )
+
+ participant_05 %>% 
+  group_by(group,half) %>% 
+  summarize(
+    count = n(),
+    mean = mean(upright),
+    median = median(upright, na.rm = TRUE),
+    sd = sd(activity,na.rm=TRUE),
+    IQR = IQR(upright, na.rm = TRUE)
+  )
+```
