@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(lme4)
 library(lmerTest)
+library(lattice)
 ```
 
 # Research Questions
@@ -32,7 +33,8 @@ part_5<- data %>%
          half = as.factor(case_when(day <= 15 ~ 1, TRUE ~ 2)), # split by 1st and 2nd half of month
          half = as.factor(half)) %>% 
   filter(month == "05") %>% # filter to month of May only
-  filter(PARTICIPANT != "CR10" | PARTICIPANT != "CR34") %>% # filter out those who did not contribute to the full month?
+  filter(PARTICIPANT != "CR10" | PARTICIPANT != "CR34") %>%
+  filter(!PARTICIPANT %in% c('CR10', 'CR34')) %>% #filter out those who did not contribute to the full month
   select(PARTICIPANT, group, half, year, upright_prop, ambulation_prop, HOURS_COVERAGE)
 
 # # aggregate so there is one value for each participant for each half
@@ -88,13 +90,34 @@ ks.test(part_2021$ambulation_prop, part_2022$ambulation_prop) # p-value < 0.05
 
 ```{r Visualizations}
 ## We should choose what visualizations are most relevant to our story
+
 # What does the distribution of upright activity look like for each half of the month and by group?
+ggplot(part_5, aes(half, upright_prop)) +
+  geom_boxplot() +
+  facet_wrap(~group)
 
 # What does the distribution of ambulation activity look like for each half of the month and by group?
+ggplot(part_5, aes(half, ambulation_prop)) +
+  geom_boxplot() +
+  facet_wrap(~group)
+
 
 # What does the distribution of upright activity look like for each participant for each half of the month?
+ggplot(part_5, aes(PARTICIPANT, upright_prop)) +
+  geom_boxplot()
 
 # What does the distribution of ambulation activity look like for each participant for each half of the month?
+ggplot(part_5, aes(PARTICIPANT, ambulation_prop)) +
+  geom_boxplot()
+
+# Hours contributed by each participant by group
+ggplot(part_5, aes(PARTICIPANT, HOURS_COVERAGE, fill = group)) +
+  geom_col()
+
+# Hours contributed by each participant by group and half of month
+ggplot(part_5, aes(PARTICIPANT, HOURS_COVERAGE, fill = group)) +
+  geom_col() +
+  facet_wrap(~half)
 ```
 
 ```{r Statistical tests to support Visualizations}
@@ -107,7 +130,7 @@ ks.test(part_trt$ambulation_prop, part_ctrl$ambulation_prop) # p-value < 0.05
 # there is a difference
 ```
 
-```{r Mixed Effects Models and Assumptions}
+```{r Mixed Effects Models}
 # random: Participant
 # fixed: group, half
 # There could be some correlation where past behavior may influence future behavior so
@@ -122,7 +145,7 @@ ggplot(part_5_agg, aes(half, y = mean_upright, color = PARTICIPANT)) +
 ggplot(part_5_agg, aes(half, y = mean_ambulation, color = PARTICIPANT)) +
   stat_summary(fun = mean, geom = "point") +
   stat_summary(fun= mean, geom = "line", aes(group = PARTICIPANT)) +
-  labs(x = "Half", y = "Mean Upright", color = "Participant")
+  labs(x = "Half", y = "Mean Ambulation", color = "Participant")
 # No interaction
 
 fit1 <- lmer(upright_prop ~ half + (1|PARTICIPANT), part_5, REML=F)
@@ -156,5 +179,24 @@ anova(fit1, fit2)
 anova(fit3, fit4)
 # group does not make a difference with larger p-value similar to above
 
+fit5 <- lmer(upright_prop ~ group + half + (1|PARTICIPANT), part_5, REML=F)
+fit6 <- lmer(ambulation_prop ~ group + half + (1|PARTICIPANT), part_5, REML=F)
+
+anova(fit1, fit5) # there is between participant variance
+anova(fit3, fit6) # there is no between participant variance
+
 ```
 
+``` {r Assumptions}
+qqnorm(residuals(fit1))
+qqnorm(residuals(fit2))
+qqnorm(residuals(fit3))
+qqnorm(residuals(fit4))
+
+
+qqmath(ranef(fit1, condVar = TRUE), strip=FALSE)$PARTICIPANT
+qqmath(ranef(fit2, condVar = TRUE), strip=FALSE)$PARTICIPANT
+
+qqmath(ranef(fit3, condVar = TRUE), strip=FALSE)$PARTICIPANT
+qqmath(ranef(fit4, condVar = TRUE), strip=FALSE)$PARTICIPANT
+```
