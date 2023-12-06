@@ -13,6 +13,7 @@ library(lmerTest)
 library(lattice)
 ```
 
+
 # Research Questions
 1) Is there a difference in ambulation and upright activity in the first half month of May vs second?
 
