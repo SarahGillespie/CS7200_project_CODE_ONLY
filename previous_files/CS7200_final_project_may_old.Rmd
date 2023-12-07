@@ -1,0 +1,207 @@
+---
+title: "CS7200 Final Project"
+author: "Sarah, Shira, Dorsa"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+library(lattice)
+```
+
+
+# Research Questions
+1) Is there a difference in ambulation and upright activity in the first half month of May vs second?
+
+2) Does personalized health coaching make a difference in the first half month of May vs second half? (We hope yes)
+
+3) How much does variability is between participants?
+
+```{r Data Cleaning}
+# read in data. This "data_full.csv" is created in the separate file "data_wrangling_for_main_df.Rmd"
+data <- read.csv('data_full.csv')
+
+# filter df for just May dates
+may_2021_2022_df<- data %>% 
+  drop_na(group) %>% # dropped participants who were not in either control or treatment
+  mutate(PARTICIPANT = as.factor(PARTICIPANT),
+         ambulation_prop = Ambulation/HOURS_COVERAGE,
+         upright_prop = Upright..Other. / HOURS_COVERAGE,
+         month = as.factor(format(as.Date(DATE, format="%Y-%m-%d"),"%m")),
+         day = as.numeric(format(as.Date(DATE), "%d")),
+         year = as.numeric(format(as.Date(DATE), "%y")),
+         half = as.factor(case_when(day <= 15 ~ 1, TRUE ~ 2)), # split data into 1st and 2nd half of month
+         half = as.factor(half)) %>% 
+  filter(month == "05") %>% # filter to month of May only
+  filter(PARTICIPANT != "CR10" | PARTICIPANT != "CR34") %>%
+  filter(!PARTICIPANT %in% c('CR10', 'CR34')) %>% #filter out participants who did not contribute to the full month
+  select(PARTICIPANT, group, half, year, upright_prop, ambulation_prop, HOURS_COVERAGE)
+
+# # aggregate so there is one value for each participant for each half
+may_2021_2022_df_agg <- may_2021_2022_df %>% 
+  group_by(PARTICIPANT, half, group) %>% 
+  summarize(mean_upright = mean(upright_prop),
+            mean_ambulation = mean(ambulation_prop))
+```
+
+## Can we combine 2021 and 2022 May data?
+
+```{r Combination Tests}
+part_2021 <- may_2021_2022_df %>% 
+  filter(year == 21)
+
+part_2022 <- may_2021_2022_df %>% 
+  filter(year == 22)
+
+part_trt <- may_2021_2022_df %>% 
+  filter(group == 'Treatment')
+
+part_ctrl <- may_2021_2022_df %>% 
+  filter(group == 'Control')
+
+# Is there a difference in mean activity in May 2021 and 2022?
+# test normality to determine non/parametric data
+# if the p-value is > 0.05, then  the distribution of the data are not significantly different from normal distribution and we can assume the normality. This did not occur in any of the four following tests.
+shapiro.test(part_2021$upright_prop) # not normal
+shapiro.test(part_2021$ambulation_prop) # not normal
+shapiro.test(part_2022$upright_prop) # not normal
+shapiro.test(part_2022$ambulation_prop) # not normal
+
+# non-parametric data
+wilcox.test(part_2021$upright_prop, part_2022$upright_prop) # p-value  < 0.05
+wilcox.test(part_2021$ambulation_prop, part_2022$ambulation_prop) # p-value < 0.01
+# there is a difference in mean activity
+
+# Is there a difference in contribution in May 2021 and 2022?
+shapiro.test(part_2021$HOURS_COVERAGE) # not normal
+shapiro.test(part_2022$HOURS_COVERAGE) # not normal
+
+ks.test(part_2021$HOURS_COVERAGE, part_2022$HOURS_COVERAGE) # p-value < 0.05
+# there is a difference in contribution
+wilcox.test(part_2021$HOURS_COVERAGE, part_2022$HOURS_COVERAGE) # p-value < 0.05
+# there is not a difference, 
+
+# Is there a difference in activity distribution in May 2021 and 2022?
+ks.test(part_2021$upright_prop, part_2022$upright_prop) # p-value < 0.05
+# there is a difference
+ks.test(part_2021$ambulation_prop, part_2022$ambulation_prop) # p-value < 0.05
+# there is a difference
+
+```
+
+```{r Visualizations}
+## We should choose what visualizations are most relevant to our story
+
+# visualize the distribution of upright activity for each half of the month broken down by control/treatment
+ggplot(may_2021_2022_df, aes(half, upright_prop)) +
+  geom_boxplot() +
+  facet_wrap(~group)
+
+# visualize the distribution of ambulation activity for each half of the month broken down by control/treatment
+ggplot(may_2021_2022_df, aes(half, ambulation_prop)) +
+  geom_boxplot() +
+  facet_wrap(~group)
+
+
+# distribution of upright activity look like for each participant during the month of May
+ggplot(may_2021_2022_df, aes(PARTICIPANT, upright_prop)) +
+  geom_boxplot()
+
+# distribution of ambulation activity look like for each participant during the month of May
+ggplot(may_2021_2022_df, aes(PARTICIPANT, ambulation_prop)) +
+  geom_boxplot()
+
+# Hours contributed by each participant by group
+ggplot(may_2021_2022_df, aes(PARTICIPANT, HOURS_COVERAGE, fill = group)) +
+  geom_col()
+
+# Hours contributed by each participant by group and half of month
+ggplot(may_2021_2022_df, aes(PARTICIPANT, HOURS_COVERAGE, fill = group)) +
+  geom_col() +
+  facet_wrap(~half)
+```
+
+```{r Statistical tests to support Visualizations}
+# Is there a difference in upright activity between treatment and control in May?
+ks.test(part_trt$upright_prop, part_ctrl$upright_prop) # p-value < 0.05
+# there is a difference
+
+# Is there a difference in ambulation activity between treatment and control in May?
+ks.test(part_trt$ambulation_prop, part_ctrl$ambulation_prop) # p-value < 0.05
+# there is a difference
+```
+
+```{r Mixed Effects Models}
+# random: Participant
+# fixed: group, half
+# There could be some correlation where past behavior may influence future behavior so
+# ambulation and upright behavior may not be independent
+
+ggplot(may_2021_2022_df_agg, aes(half, y = mean_upright, color = PARTICIPANT)) +
+  stat_summary(fun = mean, geom = "point") +
+  stat_summary(fun= mean, geom = "line", aes(group = PARTICIPANT)) +
+  labs(x = "Half", y = "Mean Upright", color = "Participant")
+# No interaction
+
+ggplot(may_2021_2022_df_agg, aes(half, y = mean_ambulation, color = PARTICIPANT)) +
+  stat_summary(fun = mean, geom = "point") +
+  stat_summary(fun= mean, geom = "line", aes(group = PARTICIPANT)) +
+  labs(x = "Half", y = "Mean Ambulation", color = "Participant")
+# No interaction
+
+fit1 <- lmer(upright_prop ~ half + (1|PARTICIPANT), may_2021_2022_df, REML=F)
+summary(fit1) 
+# second half not significant compared to first half but more upright
+
+fit2 <- lmer(upright_prop ~ group + half + (1|PARTICIPANT), may_2021_2022_df, REML=F)
+summary(fit2) 
+# trt group is sigificant compared to ctrl but less upright
+# second half not significant compared to first half but more upright
+
+fit3 <- lmer(ambulation_prop ~ half + (1|PARTICIPANT), may_2021_2022_df, REML=F)
+summary(fit3)
+# second half is significant compared to first half and more ambulation
+
+fit4 <- lmer(ambulation_prop ~ group + half + (1|PARTICIPANT), may_2021_2022_df, REML=F)
+summary(fit4)
+# trt group is not significant compared to crtl but more ambulation
+# second half is significant compared to first half and more ambulation
+
+# ICC for participant variability
+fit1_var <- 0.0015214/ (0.0015214 + 0.0004965)
+fit2_var <- 0.0010524/ (0.0010524 + 0.0004965)
+fit3_var <- 0.0002108/ (0.0002108 + 0.0002577)
+fit4_var <- 0.0001935/ (0.0001935 + 0.0002576)
+
+# Likelihood test to see if group makes a difference
+anova(fit1, fit2)
+# group makes a difference with smaller p-value similar to above
+
+anova(fit3, fit4)
+# group does not make a difference with larger p-value similar to above
+
+fit5 <- lmer(upright_prop ~ group + half + (1|PARTICIPANT), may_2021_2022_df, REML=F)
+fit6 <- lmer(ambulation_prop ~ group + half + (1|PARTICIPANT), may_2021_2022_df, REML=F)
+
+anova(fit1, fit5) # there is between participant variance
+anova(fit3, fit6) # there is no between participant variance
+
+```
+
+``` {r Assumptions}
+qqnorm(residuals(fit1))
+qqnorm(residuals(fit2))
+qqnorm(residuals(fit3))
+qqnorm(residuals(fit4))
+
+
+qqmath(ranef(fit1, condVar = TRUE), strip=FALSE)$PARTICIPANT
+qqmath(ranef(fit2, condVar = TRUE), strip=FALSE)$PARTICIPANT
+
+qqmath(ranef(fit3, condVar = TRUE), strip=FALSE)$PARTICIPANT
+qqmath(ranef(fit4, condVar = TRUE), strip=FALSE)$PARTICIPANT
+```
