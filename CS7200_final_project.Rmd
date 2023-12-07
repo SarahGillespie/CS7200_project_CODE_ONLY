@@ -174,38 +174,43 @@ summary(fit4)
 # second half is non significant compared to first half
 
 # ICC for participant variability
-fit1_var <- 0.000844/ (0.000844 + 0.000452)
-fit2_var <- 0.0005367/ (0.0005367 + 0.0004520)
-fit3_var <- 0.0001077/ (0.0001077 + 0.0001510)
-fit4_var <- 0.0001054/ (0.0001054 + 0.0001510)
+# ICC formula: the ICC is calculated as a ratio ICC = (variance of interest) / (total variance) = (variance of interest) / (variance of interest + unwanted variance)
+    # Less than 0.50: Poor reliability
+    # Between 0.5 and 0.75: Moderate reliability
+    # Between 0.75 and 0.9: Good reliability
+    # Greater than 0.9: Excellent reliability
+fit1_var <- 0.000844/ (0.000844 + 0.000452) # result = 0.6512346 = Moderate reliability
+fit2_var <- 0.0005367/ (0.0005367 + 0.0004520) # result = 0.542834 = Moderate reliability
+fit3_var <- 0.0001077/ (0.0001077 + 0.0001510) # result = 0.4163123 = Poor reliability
+fit4_var <- 0.0001054/ (0.0001054 + 0.0001510) # result = 0.4110764 = Poor reliability
 
 # Likelihood test to see if group makes a difference
 anova(fit1, fit2)
-# group makes a difference with smaller p-value similar to above
+# group makes a difference with p-value of 0.02178
 
 anova(fit3, fit4)
-# group does not make a difference with larger p-value similar to above
+# group does not make a difference with p-value of 0.6254
 
 fit5 <- lmer(upright_prop ~ group + (1|PARTICIPANT), part_3, REML=F)
 fit6 <- lmer(ambulation_prop ~ group + (1|PARTICIPANT), part_3, REML=F)
 
-anova(fit2, fit5) # half does not make a difference
-anova(fit4, fit6) # half does not make a difference
+anova(fit2, fit5) # half does not make a difference with a p-value of 0.6393
+anova(fit4, fit6) # half does not make a difference with a p-value of 0.06341
 
 ```
 
 ``` {r Assumptions}
-qqnorm(residuals(fit1))
-qqnorm(residuals(fit2))
-qqnorm(residuals(fit3))
-qqnorm(residuals(fit4))
+qqnorm(residuals(fit1)) # the data does not fall on the 45-degree reference line as well as I've seen before.
+qqnorm(residuals(fit2)) # the data does not fall on the 45-degree reference line as well as I've seen before.
+qqnorm(residuals(fit3)) # better normality with how the data falls on the 45-degree reference line.
+qqnorm(residuals(fit4)) # better normality with how the data falls on the 45-degree reference line.
 
 
-qqmath(ranef(fit1, condVar = TRUE), strip=FALSE)$PARTICIPANT
-qqmath(ranef(fit2, condVar = TRUE), strip=FALSE)$PARTICIPANT
+qqmath(ranef(fit1, condVar = TRUE), strip=FALSE)$PARTICIPANT # limited points but somewhat follows the reference line
+qqmath(ranef(fit2, condVar = TRUE), strip=FALSE)$PARTICIPANT # limited points but somewhat follows the reference line
 
-qqmath(ranef(fit3, condVar = TRUE), strip=FALSE)$PARTICIPANT
-qqmath(ranef(fit4, condVar = TRUE), strip=FALSE)$PARTICIPANT
+qqmath(ranef(fit3, condVar = TRUE), strip=FALSE)$PARTICIPANT # limited points but somewhat follows the reference line
+qqmath(ranef(fit4, condVar = TRUE), strip=FALSE)$PARTICIPANT # limited points but somewhat follows the reference line
 ```
 
 
